@@ -1,0 +1,27 @@
+# Временные файлы Unity
+/Library/
+/Temp/
+/Obj/
+/Logs/
+/Build/
+/Builds/
+/UserSettings/
+
+# Файлы IDE и системы
+.idea/
+.vs/
+.vscode/
+*.sln
+*.csproj
+*.unitypackage
+
+# Ассеты (индексируем только мета-файлы, если нужно, но обычно код важнее)
+*.mp3
+*.wav
+*.fbx
+*.mat
+*.anim
+*.unity
+*.png
+*.jpg
+*.jpeg
