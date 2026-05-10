@@ -23,7 +23,17 @@ public class NPCCitySpawner : MonoBehaviour
     [Header("Visuals")]
     [SerializeField] private bool forceSolidBlackMaterial = true;
 
+    [Header("Pool")]
+    [Tooltip("Maximum number of NPC instances pooled. If 0, defaults to npcCount.")]
+    [SerializeField] private int poolLimit = 0;
+    [Tooltip("If true, uses existing child GameObjects under this spawner as the pool (no Instantiate).")]
+    [SerializeField] private bool useSceneChildrenAsPool = true;
+
     private Material sharedBlackMaterial;
+    // simple pool (lazily populated)
+    private GameObject[] npcPool;
+    private int poolIndex = 0;
+    private int instantiatedCount = 0;
 
     private void Start()
     {
@@ -38,9 +48,116 @@ public class NPCCitySpawner : MonoBehaviour
             sharedBlackMaterial = CreateBlackMaterial();
         }
 
+        // prepare pool storage (lazy instantiation)
+        int limit = poolLimit > 0 ? poolLimit : npcCount;
+        CreatePool(limit);
+        // spawn initial NPCs (instances will be created lazily)
+        SpawnAllFromPool();
+    }
+
+    private void CreatePool(int size)
+    {
+        npcPool = new GameObject[size];
+        poolIndex = 0;
+        instantiatedCount = 0;
+
+        if (useSceneChildrenAsPool)
+        {
+            // Collect suitable child objects (already placed in scene) to serve as pool
+            var candidates = new System.Collections.Generic.List<GameObject>();
+            foreach (Transform child in transform)
+            {
+                if (child == null) continue;
+                GameObject go = child.gameObject;
+                if (go == null) continue;
+
+                // Heuristic: treat child as NPC if it has NavMeshAgent or NPCWanderer
+                if (go.GetComponent<NavMeshAgent>() != null || go.GetComponent<NPCWanderer>() != null)
+                {
+                    candidates.Add(go);
+                }
+            }
+
+            int fill = Mathf.Min(size, candidates.Count);
+            for (int i = 0; i < fill; i++)
+            {
+                npcPool[i] = candidates[i];
+                npcPool[i].SetActive(false);
+            }
+            instantiatedCount = fill;
+
+            if (fill < size)
+            {
+                Debug.LogWarning($"NPCCitySpawner: only found {fill} child NPCs for pool, requested {size}. Set poolLimit or add NPC children.");
+            }
+            return;
+        }
+    }
+
+    private GameObject GetPooledNpc()
+    {
+        if (npcPool == null || npcPool.Length == 0) return null;
+
+        // search for an available inactive object starting from poolIndex
+        for (int i = 0; i < npcPool.Length; i++)
+        {
+            int idx = (poolIndex + i) % npcPool.Length;
+            GameObject candidate = npcPool[idx];
+            if (candidate == null) continue;
+
+            if (!candidate.activeInHierarchy)
+            {
+                poolIndex = (idx + 1) % npcPool.Length;
+                return candidate;
+            }
+        }
+
+        // nothing available
+        return null;
+    }
+
+    private void SpawnAllFromPool()
+    {
         for (int i = 0; i < npcCount; i++)
         {
-            SpawnSingleNpc();
+            SpawnNpcFromPool();
+        }
+    }
+
+    private void SpawnNpcFromPool()
+    {
+        Vector3 center = cityCenterPoint != null ? cityCenterPoint.position : Vector3.zero;
+
+        for (int attempt = 0; attempt < maxSpawnAttemptsPerNpc; attempt++)
+        {
+            Vector3 randomPoint = center + new Vector3(
+                Random.Range(-cityHalfSize.x, cityHalfSize.x),
+                spawnHeight,
+                Random.Range(-cityHalfSize.y, cityHalfSize.y));
+
+            if (!NavMesh.SamplePosition(randomPoint, out NavMeshHit navHit, 20f, NavMesh.AllAreas))
+            {
+                continue;
+            }
+
+            GameObject npc = GetPooledNpc();
+            if (npc == null) return; // pool exhausted
+
+            npc.transform.SetParent(transform, true);
+            npc.transform.position = navHit.position;
+            npc.transform.rotation = Quaternion.identity;
+            npc.SetActive(true);
+
+            EnsureNavMeshAgent(npc, out NavMeshAgent agent);
+            if (agent != null)
+            {
+                agent.Warp(navHit.position);
+                ConfigureAgent(agent);
+            }
+
+            EnsureWanderComponent(npc);
+            ApplyBlackMaterial(npc);
+            return;
         }
     }
 
@@ -60,14 +177,16 @@ public class NPCCitySpawner : MonoBehaviour
                 continue;
             }
 
-            // Создаем NPC
-            GameObject npc = Instantiate(npcModelPrefab, navHit.position, Quaternion.identity, transform);
+            // try to get from pool (lazily instantiate if required)
+            GameObject npc = GetPooledNpc();
+            if (npc == null) return;
 
-            // Настраиваем агента
+            npc.transform.SetParent(transform, true);
+            npc.transform.position = navHit.position;
+            npc.transform.rotation = Quaternion.identity;
+            npc.SetActive(true);
+
             EnsureNavMeshAgent(npc, out NavMeshAgent agent);
-            EnsureNpcCollider(npc);
-
-            // КРИТИЧЕСКИЙ МОМЕНТ: Принудительно ставим агента на NavMesh
             if (agent != null)
             {
                 agent.Warp(navHit.position);
@@ -78,6 +197,21 @@ public class NPCCitySpawner : MonoBehaviour
             ApplyBlackMaterial(npc);
             return;
         }
+    }
+
+    // Return NPC back to pool (deactivate and reset). Call this when NPC 'dies' or is removed.
+    public void ReleaseNpc(GameObject npc)
+    {
+        if (npc == null) return;
+
+        // stop agent if present
+        if (npc.TryGetComponent<NavMeshAgent>(out var agent))
+        {
+            agent.ResetPath();
+        }
+
+        npc.SetActive(false);
+        npc.transform.SetParent(transform, true);
     }
 
     private void EnsureNavMeshAgent(GameObject npc, out NavMeshAgent agent)

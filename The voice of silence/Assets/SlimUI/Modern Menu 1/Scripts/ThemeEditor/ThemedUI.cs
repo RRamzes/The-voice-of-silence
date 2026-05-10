@@ -15,8 +15,10 @@ namespace SlimUI.ModernMenu{
 			OnSkinUI();
 		}
 
-		public virtual void Update(){
+		#if UNITY_EDITOR
+		public virtual void OnValidate(){
 			OnSkinUI();
 		}
+		#endif
 	}
 }

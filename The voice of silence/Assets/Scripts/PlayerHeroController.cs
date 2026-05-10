@@ -34,6 +34,8 @@ public class PlayerHeroController : MonoBehaviour
     private Vector3 standingControllerCenter;
     private float standingStepOffset;
     private bool isCrouching;
+    private bool jumpRequested = false;
+    private bool escapeToggleRequested = false;
 
     private void Awake()
     {
@@ -73,11 +75,12 @@ public class PlayerHeroController : MonoBehaviour
         }
     }
 
-    private void Update()
+    private void FixedUpdate()
     {
-        if (allowEscapeCursorToggle && Input.GetKeyDown(KeyCode.Escape))
+        if (escapeToggleRequested)
         {
             SetCursorLocked(Cursor.lockState != CursorLockMode.Locked);
+            escapeToggleRequested = false;
         }
 
         HandleMouseLook();
@@ -147,9 +150,10 @@ public class PlayerHeroController : MonoBehaviour
             verticalVelocity = -2f;
         }
 
-        if (controller.isGrounded && Input.GetKeyDown(jumpKey))
+        if (controller.isGrounded && jumpRequested)
         {
             verticalVelocity = Mathf.Sqrt(jumpHeight * -2f * gravity);
+            jumpRequested = false;
         }
 
         verticalVelocity += gravity * Time.deltaTime;
@@ -284,5 +288,23 @@ public class PlayerHeroController : MonoBehaviour
     {
         Cursor.lockState = isLocked ? CursorLockMode.Locked : CursorLockMode.None;
         Cursor.visible = !isLocked;
+    }
+
+    private void OnGUI()
+    {
+        Event e = Event.current;
+        if (e != null && e.type == EventType.KeyDown)
+        {
+            KeyCode jumpKey = KeyBindManager.GetBoundKey("Jump", KeyCode.Space);
+            if (e.keyCode == jumpKey)
+            {
+                jumpRequested = true;
+            }
+
+            if (allowEscapeCursorToggle && e.keyCode == KeyCode.Escape)
+            {
+                escapeToggleRequested = true;
+            }
+        }
     }
 }

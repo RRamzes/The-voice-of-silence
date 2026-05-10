@@ -44,7 +44,7 @@ namespace SlimUI.ModernMenu{
         public GameObject PanelCombat;
         [Tooltip("The UI Sub-Panel under KEY BINDINGS for GENERAL")]
         public GameObject PanelGeneral;
-        
+
 
         // highlights in settings screen
         [Header("SETTINGS SCREEN")]
@@ -122,7 +122,7 @@ namespace SlimUI.ModernMenu{
 			if(extrasMenu) extrasMenu.SetActive(false);
 			playMenu.SetActive(true);
 		}
-		
+
 		public void PlayCampaignMobile(){
 			exitMenu.SetActive(false);
 			if(extrasMenu) extrasMenu.SetActive(false);
@@ -268,22 +268,20 @@ namespace SlimUI.ModernMenu{
 			mainCanvas.SetActive(false);
 			loadingMenu.SetActive(true);
 
-			while (!operation.isDone){
-				float progress = Mathf.Clamp01(operation.progress / .95f);
-				loadingBar.value = progress;
 
-				if (operation.progress >= 0.9f && waitForInput){
+			yield return new WaitUntil(() => operation.progress >= 0.9f || operation.isDone);
+
+			// Sync final state
+			loadingBar.value = 1f;
+			if (operation.progress >= 0.9f){
+				if (waitForInput){
 					loadPromptText.text = "Press " + userPromptKey.ToString().ToUpper() + " to continue";
-					loadingBar.value = 1;
-
-					if (Input.GetKeyDown(userPromptKey)){
-						operation.allowSceneActivation = true;
-					}
-                }else if(operation.progress >= 0.9f && !waitForInput){
+					// wait until user presses the key
+					yield return new WaitUntil(() => Input.GetKeyDown(userPromptKey));
+					operation.allowSceneActivation = true;
+				} else {
 					operation.allowSceneActivation = true;
 				}
-
-				yield return null;
 			}
 		}
 	}

@@ -31,7 +31,7 @@ namespace SlimUI.ModernMenu{
 		public GameObject texturelowtextLINE;
 		public GameObject texturemedtextLINE;
 		public GameObject texturehightextLINE;
-		public GameObject cameraeffectstext; 
+		public GameObject cameraeffectstext;
 
 		[Header("GAME SETTINGS")]
 		public GameObject showhudtext;
@@ -50,11 +50,17 @@ namespace SlimUI.ModernMenu{
 		public GameObject sensitivityYSlider;
 		public GameObject mouseSmoothSlider;
 
+		// cached slider components
+		private Slider musicSliderComp;
+		private Slider sensitivityXSliderComp;
+		private Slider sensitivityYSliderComp;
+		private Slider mouseSmoothSliderComp;
+
 		private float sliderValue = 0.0f;
 		private float sliderValueXSensitivity = 0.0f;
 		private float sliderValueYSensitivity = 0.0f;
 		private float sliderValueSmoothing = 0.0f;
-		
+
 
 		public void  Start (){
 			// check difficulty
@@ -197,14 +203,19 @@ namespace SlimUI.ModernMenu{
 				texturemedtextLINE.gameObject.SetActive(false);
 				texturehightextLINE.gameObject.SetActive(true);
 			}
+
+			// cache slider components and subscribe to events
+			musicSliderComp = musicSlider.GetComponent<Slider>();
+			sensitivityXSliderComp = sensitivityXSlider.GetComponent<Slider>();
+			sensitivityYSliderComp = sensitivityYSlider.GetComponent<Slider>();
+			mouseSmoothSliderComp = mouseSmoothSlider.GetComponent<Slider>();
+
+			if (musicSliderComp != null) musicSliderComp.onValueChanged.AddListener(v => PlayerPrefs.SetFloat("MusicVolume", v));
+			if (sensitivityXSliderComp != null) sensitivityXSliderComp.onValueChanged.AddListener(v => sliderValueXSensitivity = v);
+			if (sensitivityYSliderComp != null) sensitivityYSliderComp.onValueChanged.AddListener(v => sliderValueYSensitivity = v);
+			if (mouseSmoothSliderComp != null) mouseSmoothSliderComp.onValueChanged.AddListener(v => { sliderValueSmoothing = v; PlayerPrefs.SetFloat("MouseSmoothing", v); });
 		}
 
-		public void Update (){
-			//sliderValue = musicSlider.GetComponent<Slider>().value;
-			sliderValueXSensitivity = sensitivityXSlider.GetComponent<Slider>().value;
-			sliderValueYSensitivity = sensitivityYSlider.GetComponent<Slider>().value;
-			sliderValueSmoothing = mouseSmoothSlider.GetComponent<Slider>().value;
-		}
 
 		public void FullScreen (){
 			Screen.fullScreen = !Screen.fullScreen;

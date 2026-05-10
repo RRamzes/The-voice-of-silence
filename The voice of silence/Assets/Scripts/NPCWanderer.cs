@@ -31,16 +31,26 @@ public class NPCWanderer : MonoBehaviour
     private void OnEnable()
     {
         repathTimer = 0f;
+        // start periodic checks instead of per-frame Update
+        InvokeRepeating(nameof(RepathTick), 0f, 0.5f);
+        InvokeRepeating(nameof(RotationTick), 0f, 0.1f);
     }
 
-    private void Update()
+    private void OnDisable()
+    {
+        CancelInvoke(nameof(RepathTick));
+        CancelInvoke(nameof(RotationTick));
+    }
+
+    private void RepathTick()
     {
         if (!isInitialized || agent == null || !agent.isOnNavMesh)
         {
             return;
         }
 
-        repathTimer -= Time.deltaTime;
+        // simple timer driven logic
+        repathTimer -= 0.5f;
 
         bool reachedTarget = !agent.pathPending && agent.hasPath &&
                              agent.remainingDistance <= agent.stoppingDistance + 0.1f;
@@ -52,11 +62,17 @@ public class NPCWanderer : MonoBehaviour
             TrySetNewDestination();
             repathTimer = repathDelay;
         }
+    }
+
+    private void RotationTick()
+    {
+        if (agent == null) return;
 
         if (agent.velocity.sqrMagnitude > 0.1f)
         {
             Quaternion lookRotation = Quaternion.LookRotation(agent.velocity.normalized);
-            transform.rotation = Quaternion.Slerp(transform.rotation, lookRotation, Time.deltaTime * 5f);
+            float t = 0.1f * 5f; // approximate smoothing using tick interval
+            transform.rotation = Quaternion.Slerp(transform.rotation, lookRotation, t);
         }
     }
 
